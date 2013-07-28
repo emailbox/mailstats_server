@@ -152,55 +152,7 @@ exports.login = function(req, res){
 			jsonError(res,101,'Unable to log this user in', result);
 		});
 
-	// Do we already have this User ID?
-	// - update or insert if we do
-
 };
-
-// exports.create_defaults = function(req, res){
-// 	// A user is trying to update some local parameters
-
-// 	console.log('exports.login');
-
-// 	// Set response Content-Type
-// 	res.contentType('json');
-
-// 	var bodyObj = req.body;
-	
-// 	if(typeof bodyObj != "object"){
-// 		jsonError(res, 101, "Expecting object");
-// 		return;
-// 	}
-// 	if(typeof bodyObj.access_token != "string"){
-// 		jsonError(res, 101, "Expecting access_token",bodyObj);
-// 		return;
-// 	}
-
-// 	// Request updated credentials from Emailbox
-// 	// - via /api/user
-// 	models.Api.updateUser(bodyObj)
-// 		.then(function(user){
-// 			// Succeeded updated user
-// 			// 
-// 			req.session.user = user; // user is OUR version of the user
-
-// 			// Return success
-// 			jsonSuccess(res,'Updated user',{
-// 				user: {
-// 					id: user.id
-// 				}
-// 			});
-
-// 		})
-// 		.fail(function(result){
-// 			// Failed to log the user in
-// 			jsonError(res,101,'Unable to log this user in', result);
-// 		});
-
-// 	// Do we already have this User ID?
-// 	// - update or insert if we do
-
-// };
 
 exports.logout = function(req, res){
 	req.session.user = null;
@@ -245,6 +197,9 @@ exports.stats = function(req, res){
 			// 0 - sent vs received
 			resultsDeferred.push(models.Stats.sent_vs_received(bodyObj, timezone_offset));
 
+			// 1 - time to respond
+			resultsDeferred.push(models.Stats.time_to_respond(bodyObj, timezone_offset));
+
 			// Wait for all searches to have been performed
 			Q.allResolved(resultsDeferred)
 				.then(function(promises){
@@ -258,6 +213,10 @@ exports.stats = function(req, res){
 						if(index == 0){
 							endResults['sent_vs_received'] = tmp_val;
 						}
+						if(index == 1){
+							endResults['time_to_respond'] = tmp_val;
+						}
+
 
 					});
 					jsonSuccess(res, '', endResults);
