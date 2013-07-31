@@ -185,6 +185,9 @@ exports.stats = function(req, res){
 	getUser.promise
 		.then(function(local_user){
 
+			// Return JSON response that we are working on it (the model gets updated)
+			jsonSuccess(res, 'Working on stats update: AppMailStatsLatest._id=1');
+
 			console.log('Perform each search');
 
 			// Timezone offset
@@ -193,39 +196,91 @@ exports.stats = function(req, res){
 			// Perform each search
 			// - not in parallel against the user's DB
 			var resultsDeferred = [];
-			
-			// 0 - sent vs received
-			resultsDeferred.push(models.Stats.sent_vs_received(bodyObj, timezone_offset));
 
-			// 1 - time to respond
-			resultsDeferred.push(models.Stats.time_to_respond(bodyObj, timezone_offset));
+			models.Api.getLastMonthEmailsAndThreads(bodyObj, timezone_offset)
+				.then(function(threads_and_emails){
+					// Separate into Sent and Received
+					// result.threads
+					// result.emails_sent
+					// result.emails_rec
+					console.log('threads_and_emails');
 
-			// Wait for all searches to have been performed
-			Q.allResolved(resultsDeferred)
-				.then(function(promises){
+					// Execute tally-er functions
 
-					// All searches complete
-					// - get all of them and return along with indexKey
-					var endResults = {};
-					promises.forEach(function (promise, index) {
-						var tmp_val = promise.valueOf();
+					// 0 - sent vs received
+					resultsDeferred.push(models.Stats.sent_vs_received(bodyObj, timezone_offset, threads_and_emails));
 
-						if(index == 0){
-							endResults['sent_vs_received'] = tmp_val;
-						}
-						if(index == 1){
-							endResults['time_to_respond'] = tmp_val;
-						}
+					// 1 - time to respond
+					resultsDeferred.push(models.Stats.time_to_respond(bodyObj, timezone_offset, threads_and_emails));
+
+					// 3 - contacts
+					resultsDeferred.push(models.Stats.contacts(bodyObj, timezone_offset, threads_and_emails));
+
+					// 4 - attachments
+					resultsDeferred.push(models.Stats.attachments(bodyObj, timezone_offset, threads_and_emails));
+
+					// Wait for all searches to have been performed
+					Q.allResolved(resultsDeferred)
+						.then(function(promises){
+
+							console.log('resolved promises');
+
+							// All searches complete
+							// - get all of them and return along with indexKey
+							var endResults = {};
+							promises.forEach(function (promise, index) {
+								var tmp_val = promise.valueOf();
+
+								if(index == 0){
+									endResults['sent_vs_received'] = tmp_val;
+								}
+								if(index == 1){
+									endResults['time_to_respond'] = tmp_val;
+								}
+								if(index == 2){
+									endResults['contacts'] = tmp_val;
+								}
+								if(index == 2){
+									endResults['attachments'] = tmp_val;
+								}
 
 
-					});
-					jsonSuccess(res, '', endResults);
+							});
+
+							// // Return results (rip out in next version)
+							// jsonSuccess(res, 'Refreshed', endResults);
+
+							// Save the new model
+							models.User.update_mailstats_latest(endResults, bodyObj.auth)
+								.then(function(){
+									// Emit update event
+									var eventData = {
+										event: 'MailStats.updated',
+										obj: true
+									};
+									models.Emailbox.event(eventData, bodyObj.auth)
+										.then(function(){
+											console.log('Emitted event ok');
+										})
+										.fail(function(err){
+											console.log('fail1');
+											console.log(err);
+										});
+								});
+
+						})
+						.fail(function(data){
+							// data == [ indexKey, errCode, errMsg, errData ]
+							console.log('fail runEventCreate multiple');
+							console.log(data);
+							jsonError(res, 101, "Failed creating multiple events");
+						});
+
+
 				})
-				.fail(function(data){
-					// data == [ indexKey, errCode, errMsg, errData ]
-					console.log('fail runEventCreate multiple');
-					console.log(data);
-					jsonError(res, 101, "Failed creating multiple events");
+				.fail(function(err){
+					console.log('getLastMonthEmailsAndThreads failed:');
+					console.log(err);
 				});
 
 

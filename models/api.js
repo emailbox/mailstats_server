@@ -13,6 +13,8 @@ var gcm_sender = new gcm.Sender('AIzaSyComNH2V2K3GErqbMkriU3obkunpVzv5Wo');
 var validator = require('validator');
 var sanitize = validator.sanitize;
 
+var _ = require('underscore');
+
 exports.loginUser = function(bodyObj){
 	// Check emailbox for a user based on the submitted credentials
 
@@ -269,6 +271,151 @@ exports.getUser = function(emailbox_id){
 
 
 };
+
+exports.getLastMonthEmailsAndThreads = function(bodyObj, timezone_offset){
+	// Returns last month of Emails (and Threads)
+
+	// Convert timezone_offset to seconds
+	timezone_offset = timezone_offset * 60;
+
+	console.log('model time_to_respond');
+
+	var defer = Q.defer();
+
+	process.nextTick(function(){
+
+		var user = {};
+
+		var today = new Date(),
+			todayInSec = parseInt(today.getTime() / 1000, 10),
+			weekInSec = 60*60*24*7,
+			monthInSec = weekInSec * 4,
+			lastWeekSeconds = todayInSec - weekInSec,
+			lastMonthInSeconds = todayInSec - monthInSec; // exactly one week, to the second
+
+
+		// Get all Threads that include a Sent email (to know we responded)
+		// Email would have \\\\Sent label
+		var threadFirstSearchData = {
+			model: 'Thread',
+			conditions: {
+				'attributes.last_message_datetime_sec' : {
+					'$gt' : lastMonthInSeconds
+				}
+			},
+			fields: [
+				'_id'
+
+			],
+			limit: 10000
+		};
+		models.Emailbox.search(threadFirstSearchData, bodyObj.auth)
+			.then(function(threads){
+				console.log('threads');
+				console.log(threads.length);
+
+				// Get all the thread._id's
+				var thread_ids = [],
+					threadsObj = {};
+				console.log(1);
+				try {
+					_.each(threads, function(thread){
+						thread_ids.push(thread.Thread._id);
+						threadsObj[thread.Thread._id] = {
+							Thread: thread.Thread,
+							Emails: []
+						}
+					});
+				}catch(er){
+					console.log(er);
+					sys.exit();
+				}
+
+				console.log(2);
+
+				// Search for all the related emails in each Thread
+				// - returning as little email data as possible, just for analysis
+
+				var allEmails = {
+					model: 'Email',
+					conditions: {
+						'attributes.thread_id' : {
+							'$in' : thread_ids
+						}
+					},
+					fields: [
+						'common.date_sec',
+						'original.headers.To_Parsed',
+						'original.headers.Cc_Parsed',
+						'original.headers.Bcc_Parsed',
+						'original.headers.From_Parsed',
+						'original.attachments.size',
+						'original.labels',
+						'attributes.thread_id'
+					],
+					sort: {
+						_id : -1
+					},
+					limit: 10000
+				};
+				console.log('allemails');
+				models.Emailbox.search(allEmails, bodyObj.auth)
+					.then(function(emails){
+						// Match emails with threads
+
+						console.log('Got all emails');
+						console.log(emails.length);
+
+						// Sort emails
+						emails = _.sortBy(emails, function(email){
+							return parseInt(email.Email.common.date_sec, 10);
+						});
+
+						var emails_sent = [],
+							emails_received = [];
+
+						_.each(emails, function(email){
+							if(threadsObj[email.Email.attributes.thread_id] == undefined){
+								// somehow got a bad email with thread_id
+								console.log('somehow got a bad email in stats');
+								return;
+							}
+
+							// Sent or received?
+							if(email.Email.original.labels.indexOf('\\\\Sent') == -1){
+								emails_received.push(email.Email);
+							} else {
+								emails_sent.push(email.Email);
+							}
+
+							// Add to emails
+							threadsObj[email.Email.attributes.thread_id].Emails.push(email.Email);
+
+						});
+
+						defer.resolve({
+							threads: threadsObj,
+							emails_sent: emails_sent,
+							emails_rec: emails_received
+						});
+
+
+					})
+					.fail(function(err){
+						console.log('Failed getting emails');
+						console.log(err);
+					});
+
+
+			});
+
+
+	});
+
+	return defer.promise;
+
+};
+
 
 exports.pushToAndroid = function(registration_id, data, collapseKey, timeToLive, numRetries){
 	// Send a Push Message to a user

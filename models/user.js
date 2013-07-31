@@ -9,6 +9,7 @@ var Q = require('q');
 var validator = require('validator');
 var sanitize = validator.sanitize;
 
+var _ = require('underscore');
 
 
 exports.getUser = function(emailbox_id){
@@ -184,35 +185,46 @@ exports.get_local_by_emailbox_id = function(emailbox_id){
 };
 
 
-exports.create_emailbox_settings = function(userAuth){
+exports.update_mailstats_latest = function(updateData, userAuth){
 	// Return settings for the auth'd user
 
 	// Create deferred
 	var defer = Q.defer();
 
-	// Default data to save to emailbox
-	var defaultData = {
-		'_id' : 1,
-		android_reg_id: null // push.android_reg_id
-	};
-
 	// Combine with defaultData
 	var userData = {
-		model: 'AppConvomailSettings',
-		obj: defaultData
+		model: 'AppMailStatsLatest',
+		conditions: {
+			_id: 1
+		},
+		paths: {
+			'$set' : updateData
+		}
 	};
 
 	// Write to emailbox
-	models.Emailbox.write(userData,userAuth)
-		.then(function(result){
+	models.Emailbox.update(userData,userAuth)
+		.then(function(updateCount){
 			// Successfully wrote settings
 
-			// Resolve
-			// - missing createdAt and updatedAt in response
-			defer.resolve(null, defaultData);
+			console.log('update count');
+			console.log(updateCount);
+
+			if(updateCount == 0){
+				// No record exists, do a Write
+				models.User.write_default_mailstats_latest(updateData, userAuth)
+					.then(function(){
+						console.log('wrote');
+						defer.resolve(null, defaultData);
+					});
+			} else {
+				// Resolve
+				defer.resolve(null, updateCount);
+			}
 		})
 		.fail(function(err){
-			console.log('Failed write');
+			console.log('Failed update');
+			console.log(err);
 			defer.reject(err);
 			// defer.resolve(err,null);
 		});
@@ -221,4 +233,40 @@ exports.create_emailbox_settings = function(userAuth){
 	return defer.promise;
 
 };
+
+exports.write_default_mailstats_latest = function(writeData, userAuth){
+	// Return settings for the auth'd user
+
+	console.log('writing');
+
+	// Create deferred
+	var defer = Q.defer();
+
+	// Default data to save to emailbox
+	writeData = _.extend(writeData, {_id: 1});
+
+	// Combine with defaultData
+	var userData = {
+		model: 'AppMailStatsLatest',
+		obj: writeData
+	};
+
+	// Write to emailbox
+	models.Emailbox.write(userData,userAuth)
+		.then(function(result){
+			// Successfully wrote settings
+			console.log('write ok');
+			// Resolve
+			// - missing createdAt and updatedAt in response
+			defer.resolve(null, result);
+		})
+		.fail(function(err){
+			console.log('Failed write');
+			console.log(err);
+			defer.reject(err);
+		});
+
+	// Return deferred
+	return defer.promise;
+}
 

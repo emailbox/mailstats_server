@@ -16,7 +16,7 @@ var _ = require('underscore');
 var validator = require('validator');
 var sanitize = validator.sanitize;
 
-exports.sent_vs_received = function(bodyObj, timezone_offset){
+exports.sent_vs_received = function(bodyObj, timezone_offset, threads_and_emails){
 	// Returns sent vs. received emails for each day in the past week
 	// - the app can show the data in different ways
 
@@ -150,7 +150,7 @@ exports.sent_vs_received = function(bodyObj, timezone_offset){
 };
 
 
-exports.time_to_respond = function(bodyObj, timezone_offset){
+exports.time_to_respond = function(bodyObj, timezone_offset, threads_and_emails){
 	// Returns sent vs. received emails for each day in the past week
 	// - the app can show the data in different ways
 
@@ -163,7 +163,6 @@ exports.time_to_respond = function(bodyObj, timezone_offset){
 
 	// Convert timezone_offset to seconds
 	timezone_offset = timezone_offset * 60;
-	console.log(timezone_offset);
 
 	console.log('model time_to_respond');
 
@@ -171,172 +170,281 @@ exports.time_to_respond = function(bodyObj, timezone_offset){
 
 	process.nextTick(function(){
 
-		var user = {};
+		// Iterate over emails in a thread and keep count of time_to_response!
+		// - collect each time_to_response into different periods of time?
+		var first_responses = [],
+			other_responses = [];
 
-		var today = new Date(),
-			todayInSec = parseInt(today.getTime() / 1000, 10),
-			weekInSec = 60*60*24*7,
-			monthInSec = weekInSec * 4,
-			lastWeekSeconds = todayInSec - weekInSec,
-			lastMonthInSeconds = todayInSec - monthInSec; // exactly one week, to the second
+		_.each(threads_and_emails.threads, function(thread_and_emails, thread_id){
+			var first_thread = null,
+				last_normal_email = null,
+				first_normal_email = null,
+				ignore_first_response = false,
+				recorded_first_response = false;
 
-
-		// Get all Threads that include a Sent email (to know we responded)
-		// Email would have \\\\Sent label
-		var threadFirstSearchData = {
-			model: 'Thread',
-			conditions: {
-				'attributes.labels.Sent' : 1,
-				'attributes.last_message_datetime_sec' : {
-					'$gt' : lastMonthInSeconds
-				}
-			},
-			fields: ['_id'],
-			limit: 10000
-		};
-		models.Emailbox.search(threadFirstSearchData, bodyObj.auth)
-			.then(function(threads){
-				console.log('threads');
-				console.log(threads.length);
-
-				// Get all the thread._id's
-				var thread_ids = _.map(threads, function(thread){
-					return thread.Thread._id;
-				});
-
-				// Create object with thread_id as key
-				var threads_obj = {};
-				_.each(thread_ids, function(thread_id){
-					threads_obj[thread_id] = [];
-				});
-
-				// Search for all the related emails in each Thread
-				// - returning as little email data as possible, just for analysis
-
-				var allEmails = {
-					model: 'Email',
-					conditions: {
-						'attributes.thread_id' : {
-							'$in' : thread_ids
+			_.each(thread_and_emails.Emails, function(email){
+				// See if \\\\Sent exists in email
+				if(email.original.labels.indexOf('\\\\Sent') == -1){
+					// Not Sent
+					if(last_normal_email){
+						// already have a normal_email
+						// see if this is the first_normal_email (for time to 1st response)
+						
+					} else {
+						// This is now the latest normal email
+						last_normal_email = email;
+						if(first_normal_email){
+							// already found the first one
+						} else {
+							first_normal_email = email;
 						}
-					},
-					fields: ['common.date_sec','original.labels','attributes.thread_id'],
-					sort: {
-						_id : -1
-					},
-					limit: 10000
-				};
-				console.log('allemails');
-				models.Emailbox.search(allEmails, bodyObj.auth)
-					.then(function(emails){
-						// Match emails with threads
-
-						console.log('Got all emails');
-
-						// Sort emails
-						emails = _.sortBy(emails, function(email){
-							return parseInt(email.Email.common.date_sec, 10);
-						});
-
-						_.each(emails, function(email){
-							if(threads_obj[email.Email.attributes.thread_id] == undefined){
-								// somehow got a bad email with thread_id
-								console.log('somehow got a bad email in stats');
-								return;
-							}
-
-							threads_obj[email.Email.attributes.thread_id].push(email);
-
-						});
+					}
 
 
+				} else {
+					// It was Sent
+					// - reset a bunch of the counters
+					if(last_normal_email){
+						// one was already received, so add to counters
+						last_normal_emali = null;
 
-						console.log('Merged threads and emails into threads_obj');
+						// need to calculate first reponse?
+						if(!ignore_first_response && !recorded_first_response){
+							recorded_first_response = true;
+							var first_email_time = first_normal_email.common.date_sec,
+								this_email_time = email.common.date_sec;
+							first_responses.push([this_email_time - first_email_time, email.common.date_sec]);
+						} else {
+							var last_email_time = last_normal_email.common.date_sec,
+								this_email_time = email.common.date_sec;
 
-						// Iterate over emails in a thread and keep count of time_to_response!
-						// - collect each time_to_response into different periods of time?
-						var first_responses = [],
-							other_responses = [];
+							other_responses.push([this_email_time - last_email_time, email.common.date_sec]);
+						}
 
-						_.each(threads_obj, function(emails, thread_id){
+					} else {
+						// None have been received yet (I started the sent)
+						ignore_first_response = true;
+					}
+					last_normal_email = null;
 
-							var first_thread = null,
-								last_normal_email = null,
-								first_normal_email = null,
-								ignore_first_response = false,
-								recorded_first_response = false;
-
-							_.each(emails, function(email){
-								// See if \\\\Sent exists in email
-								if(email.Email.original.labels.indexOf('\\\\Sent') == -1){
-									// Not Sent
-									if(last_normal_email){
-										// already have a normal_email
-										// see if this is the first_normal_email (for time to 1st response)
-										
-									} else {
-										// This is now the latest normal email
-										last_normal_email = email;
-										if(first_normal_email){
-											// already found the first one
-										} else {
-											first_normal_email = email;
-										}
-									}
-
-
-								} else {
-									// It was Sent
-									// - reset a bunch of the counters
-									if(last_normal_email){
-										// one was already received, so add to counters
-										last_normal_emali = null;
-
-										// need to calculate first reponse?
-										if(!ignore_first_response && !recorded_first_response){
-											recorded_first_response = true;
-											var first_email_time = first_normal_email.Email.common.date_sec,
-												this_email_time = email.Email.common.date_sec;
-											first_responses.push([this_email_time - first_email_time, email.Email.common.date_sec]);
-										} else {
-											var last_email_time = last_normal_email.Email.common.date_sec,
-												this_email_time = email.Email.common.date_sec;
-
-											other_responses.push([this_email_time - last_email_time, email.Email.common.date_sec]);
-										}
-
-									} else {
-										// None have been received yet (I started the sent)
-										ignore_first_response = true;
-									}
-									last_normal_email = null;
-
-								}
-
-
-							});
-
-						});
-
-
-						console.log('done');
-
-						// console.log();
-						defer.resolve({
-							first_responses: first_responses,
-							other_responses: other_responses
-						});
-
-
-					})
-					.fail(function(err){
-						console.log('Failed getting emails');
-						console.log(err);
-					});
-
+				}
 
 			});
 
+		});
+
+		defer.resolve({
+			first_responses: first_responses,
+			other_responses: other_responses
+		});
+
+	});
+
+	return defer.promise;
+
+};
+
+
+exports.contacts = function(bodyObj, timezone_offset, threads_and_emails){
+	// Frequently contacted senders
+	// - individual and domain top 10s for To, Cc, Bcc separated by sent/received
+
+	console.log('model contacts');
+
+	var defer = Q.defer();
+
+	process.nextTick(function(){
+
+		var result = {
+			addresses: {
+				sent: {
+					To: {},
+					Cc: {},
+					Bcc: {}
+				},
+				received: {
+					To: {},
+					Cc: {},
+					Bcc: {},
+					From: {}
+				},
+			},
+			domains: {
+				sent: {
+					To: {},
+					Cc: {},
+					Bcc: {}
+				},
+				received: {
+					To: {},
+					Cc: {},
+					Bcc: {},
+					From: {}
+				},
+			},
+			top10: {
+				addresses: {
+					sent: {
+						To:[],
+						Cc:[],
+						Bcc:[]
+					},
+					received: {
+						To:[],
+						Cc:[],
+						Bcc:[],
+						From: []
+					}
+				},
+				domains: {
+					sent: {
+						To:[],
+						Cc:[],
+						Bcc:[]
+					},
+					received: {
+						To:[],
+						Cc:[],
+						Bcc:[],
+						From: []
+					}
+				}
+			}
+		};
+
+		// iterate over all Sent emails
+		_.each(threads_and_emails.emails_sent, function(email){
+
+			var addr_types = ['To','Cc','Bcc'];
+
+			_.each(addr_types, function(addr_type){
+
+				_.each(email.original.headers[addr_type+'_Parsed'], function(addr){
+					addr = addr[1].toLowerCase();
+					var domain = addr.replace(/.*@/, "").toLowerCase();
+					// address
+					if(result.addresses.sent[addr_type][addr] == undefined){
+						result.addresses.sent[addr_type][addr] = 0;
+					}
+					result.addresses.sent[addr_type][addr]++;
+					// domain
+					if(result.domains.sent[addr_type][domain] == undefined){
+						result.domains.sent[addr_type][domain] = 0;
+					}
+					result.domains.sent[addr_type][domain]++;
+				});
+				//top10
+				result.top10.addresses.sent[addr_type] = _.sortBy(
+					_.map(result.addresses.sent[addr_type], function(count, addr){
+						return [count, addr];
+					}), function(item){
+					return item[0] * -1;
+				}).splice(0,10);
+				result.top10.domains.sent[addr_type] = _.sortBy(
+					_.map(result.domains.sent[addr_type], function(count, addr){
+						return [count, addr];
+					}), function(item){
+					return item[0] * -1;
+				}).splice(0,5);
+			});
+		});
+
+		// received
+		_.each(threads_and_emails.emails_rec, function(email){
+
+			var addr_types = ['To','Cc','From'];
+
+			_.each(addr_types, function(addr_type){
+
+				_.each(email.original.headers[addr_type+'_Parsed'], function(addr){
+					addr = addr[1].toLowerCase();
+					var domain = addr.replace(/.*@/, "").toLowerCase();
+					// address
+					if(result.addresses.received[addr_type][addr] == undefined){
+						result.addresses.received[addr_type][addr] = 0;
+					}
+					result.addresses.received[addr_type][addr]++;
+					// domain
+					if(result.domains.received[addr_type][domain] == undefined){
+						result.domains.received[addr_type][domain] = 0;
+					}
+					result.domains.received[addr_type][domain]++;
+				});
+				//top10
+				result.top10.addresses.received[addr_type] = _.sortBy(
+					_.map(result.addresses.received[addr_type], function(count, addr){
+						return [count, addr];
+					}), function(item){
+					return item[0] * -1;
+				}).splice(0,10);
+				result.top10.domains.received[addr_type] = _.sortBy(
+					_.map(result.domains.received[addr_type], function(count, addr){
+						return [count, addr];
+					}), function(item){
+					return item[0] * -1;
+				}).splice(0,5);
+			});
+		});
+
+		defer.resolve(result.top10);
+
+	});
+
+	return defer.promise;
+
+};
+
+
+exports.attachments = function(bodyObj, timezone_offset, threads_and_emails){
+	// Frequently contacted senders
+	// - individual and domain top 10s for To, Cc, Bcc separated by sent/received
+
+	console.log('model attachments');
+
+	var defer = Q.defer();
+
+	process.nextTick(function(){
+
+		var result = {
+			sent: {
+				count: 0,
+				size: 0
+			},
+			received: {
+				count: 0,
+				size: 0
+			}
+		};
+
+		// iterate over all Sent emails
+		_.each(threads_and_emails.emails_sent, function(email){
+
+			try {
+				_.each(email.original.attachments, function(attachment){
+					result.sent.count++;
+					result.sent.size += attachment.size;
+				});	
+			} catch(err){
+				console.log('attachment err');
+			}
+
+		});
+
+		// received
+		_.each(threads_and_emails.emails_rec, function(email){
+
+			try {
+				_.each(email.original.attachments, function(attachment){
+					result.received.count++;
+					result.received.size += attachment.size;
+				});	
+			} catch(err){
+				console.log('attachment err');
+			}
+			
+		});
+
+		defer.resolve(result);
 
 	});
 
