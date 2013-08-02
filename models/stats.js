@@ -83,18 +83,28 @@ exports.sent_vs_received = function(bodyObj, timezone_offset, threads_and_emails
 
 				// Get expected days
 				var expected_days = {};
+				var expected_hours = {};
 				var today = new Date(),
-					today_real = parseInt(today.getTime() / 1000, 10) - timezone_offset; // in seconds
+					today_real = parseInt(today.getTime() / 1000, 10) - timezone_offset
+					today_real_date = new Date(today_real * 1000); // in seconds
 
-				[0,1,2,3,4,5,6].forEach(function(val, index){
+				// days
+				_.range(0,7).forEach(function(val, index){
 					var tmp_date = new Date((today_real - (val * 24 * 60 * 60)) * 1000),
 						// day_of_month = tmp_date.getDate();
 						day_of_month = tmp_date.toFormat('D-') + tmp_date.toFormat('DDD').substr(0,2);
 					expected_days[ day_of_month ] = 0;
 				});
 
+				// hours
+				_.range(0,24).forEach(function(val, index){
+					expected_hours[ val ] = 0;
+				});
+
 				var sentDateArray = extend({},expected_days),
-					receivedDateArray = extend({},expected_days);
+					receivedDateArray = extend({},expected_days)
+					sentHoursArray = extend({}, expected_hours),
+					receivedHoursArray = extend({}, expected_hours);
 
 				promises.forEach(function (promise, index) {
 					var tmp_val = promise.valueOf();
@@ -104,13 +114,13 @@ exports.sent_vs_received = function(bodyObj, timezone_offset, threads_and_emails
 					// Iterate over emails and add to correct date in array
 					tmp_val.forEach(function(emailModel){
 						// Get date for email
-						// console.log(emailModel.Email.common.date_sec * 1000);
 						var old = emailModel.Email.common.date_sec,
 							newtime = old - timezone_offset;
 						
 						var tmp_date = new Date(newtime * 1000),
 							// day_of_month = tmp_date.getDate();
-							day_of_month = tmp_date.toFormat('D-') + tmp_date.toFormat('DDD').substr(0,2);
+							day_of_month = tmp_date.toFormat('D-') + tmp_date.toFormat('DDD').substr(0,2)
+							date_hours = tmp_date.getHours();
 
 						if(index == 0){
 							// Sent
@@ -118,12 +128,23 @@ exports.sent_vs_received = function(bodyObj, timezone_offset, threads_and_emails
 								return; // already set possible days
 							}
 							sentDateArray[day_of_month]++;
+
+							// Today? (add to hours array)
+							if(today_real_date.getDate() == tmp_date.getDate()){
+								sentHoursArray[date_hours]++;
+							}
+
 						} else {
 							// Received
 							if(receivedDateArray[day_of_month] == undefined){
 								return; // already set possible days
 							}
 							receivedDateArray[day_of_month]++
+
+							// Today? (add to hours array)
+							if(today_real_date.getDate() == tmp_date.getDate()){
+								receivedHoursArray[date_hours]++;
+							}
 
 						}
 
@@ -134,8 +155,11 @@ exports.sent_vs_received = function(bodyObj, timezone_offset, threads_and_emails
 				// Resolve deferred
 				defer.resolve({
 					sent: sentDateArray, 
-					received: receivedDateArray}
-				);
+					received: receivedDateArray,
+					hoursSent: sentHoursArray,
+					hoursReceived: receivedHoursArray
+				});
+
 			})
 			.fail(function(errData){
 				console.log('Fail');

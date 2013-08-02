@@ -253,6 +253,7 @@ exports.stats = function(req, res){
 							// Save the new model
 							models.User.update_mailstats_latest(endResults, bodyObj.auth)
 								.then(function(){
+									console.log('back from update_mailstats_latest');
 									// Emit update event
 									var eventData = {
 										event: 'MailStats.updated',

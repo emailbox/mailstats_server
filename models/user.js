@@ -166,10 +166,20 @@ exports.get_local_by_emailbox_id = function(emailbox_id){
 
 				models.mysql.release(client);
 
-				if(rows.length != 1){
-					// Bad user
-					console.log('Bad User');
+				if(error){
+					defer.reject();
 					return;
+				}
+
+				try {
+					if(rows.length != 1){
+						// Bad user
+						console.log('Bad User');
+						return;
+					}
+				} catch(err){
+					console.log('Bad user');
+					defer.reject();
 				}
 
 				// Get user
@@ -215,7 +225,7 @@ exports.update_mailstats_latest = function(updateData, userAuth){
 				models.User.write_default_mailstats_latest(updateData, userAuth)
 					.then(function(){
 						console.log('wrote');
-						defer.resolve(null, defaultData);
+						defer.resolve(null, updateData);
 					});
 			} else {
 				// Resolve
