@@ -1,6 +1,9 @@
 # Mailstats  
 Displays stats on your email inbox such as Sent vs. Received 
 
+Screenshot (8/4/2013): https://dl.dropboxusercontent.com/u/6673634/Screenshots/Mail%20Stats.png  
+
+
 ## Run client app  
 You can modify and run the basic stand-alone client app (that communicates to the default MailStats server) by cloning the repo and visiting the /public/app directory (try using localhost).  
 
