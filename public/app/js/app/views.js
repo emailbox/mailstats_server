@@ -2109,7 +2109,7 @@ App.Views.Stats = Backbone.View.extend({
 
 		// XY CHART
 		chart2 = new AmCharts.AmXYChart();
-		chart2.pathToImages = "http://www.amcharts.com/lib/images/";
+		// chart2.pathToImages = "http://www.amcharts.com/lib/images/";
 		chart2.marginRight = 0;
 		chart2.marginTop = 0;    
 		chart2.autoMarginOffset = 0;
