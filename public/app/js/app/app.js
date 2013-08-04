@@ -18,7 +18,7 @@ var App = {
 		version: "0.0.13",
 		InMemory: {},
 		online: true,
-		LoggedIn: false, // Logged into convomail servers
+		LoggedIn: false, // Logged into mailstats servers
 		notifications_queue: [],
 		paused: false,
 		was_paused: false,
@@ -46,8 +46,6 @@ var App = {
 			// Models on server
 			Thread: {},
 			Email: {},
-			AppConvomailLeisureFilter: {},
-			AppConvomailDebugCss: {},
 
 			// Not Models on server (local only, sync later)
 			ThreadsRecentlyViewed: [],
@@ -83,9 +81,6 @@ var App = {
 		App.Data.xy.win_width = $(window).width();
 
 		var currentUrl = window.location.href;
-		
-		// Filepicker
-		filepicker.setKey(App.Credentials.filepicker_key);
 
 		// Embedly
 		$.embedly.defaults.key = App.Credentials.embedly_key;
@@ -166,60 +161,9 @@ var App = {
 
 				console.log('Loaded Storage.init');
 
-				// // Listen for request to save AppDataStore
-				// App.Events.on('saveAppDataStore',function(opts){
-				// 	// Store App.Data.Store into localStorage!
-				// 	App.Utils.Storage.set('AppDataStore',App.Data.Store);
-				// });
-				// // Save every 60 seconds
-				// // - after coming back, does it run a ton of times? (queued when in standby?)
-				// var redoSave = function(){
-				// 	window.setTimeout(function(){
-				// 		console.info('saving App.Data.Store');
-				// 		App.Events.trigger('saveAppDataStore',true);
-				// 		redoSave();
-				// 	},60000);
-				// }
-				// redoSave();
-
-				// CSS
-				// - local or debug version of CSS
-				App.Utils.Storage.get('cssDebugOn')
-					.then(function(cssDebugText){
-						if(cssDebugText != undefined && cssDebugText != null){
-							// Using debug version
-							// Check for local version of debug css
-							// - App.Data.Store.AppConvomailDebugCss
-
-							// Add to page
-							$('#NormalCSS').remove();
-							$('head').append('<style id="DebugCSS" type="text/css">'+cssDebugText+'</style>');
-
-						} 
-						else {
-							// Not using debug version
-							// - add local extra.css
-							$('head').append('<link id="NormalCSS" rel="stylesheet" href="css/extra.css" type="text/css" />');
-
-							// Get local version of CSS
-							$.ajax({
-								url: 'css/extra.css',
-								cache: false,
-								success: function(cssText){
-									// App.Utils.Storage.set('cssDebugOn',cssText);
-								}
-							});
-						}
-					});
-
-
 				// init Router
 				// - not sure if this actually launches the "" position...
 				App.router = new App.Router();
-				// Backbone.history.start({silent: true}); // Launches "" router
-				// Backbone.history.start(); // Launches "" router
-				// App.router.navigate('',true);
-
 
 				// Get access_token if it exists
 				var oauthParams = App.Utils.getOAuthParamsInUrl();
@@ -259,7 +203,7 @@ var App = {
 				// 	App.Data.Store.Contacts.fetch();
 				// },10000);
 
-				// Get access_token, set to app global, login to convomail server (doesn't allow offline access yet)
+				// Get access_token, set to app global, login to mailstats server (doesn't allow offline access yet)
 				// - switch to be agnostic to online state (if logged in, let access offline stored data: need better storage/sync mechanisms)
 				App.Utils.Storage.get(App.Credentials.prefix_access_token + 'access_token', 'critical')
 					.then(function(access_token){
@@ -276,17 +220,17 @@ var App = {
 							return;
 						}
 
-						// Validate credentials with convomail server and emailbox 
+						// Validate credentials with mailstats server and emailbox 
 						// - make an api request to load my email address
 
 						var dfd = $.Deferred();
 
-						// Logged in on convomail server
+						// Logged in on mailstats server
 						App.Data.LoggedIn = true;
 
-						App.Plugins.Convomail.login()
+						App.Plugins.MailStats.login()
 							.then(function(){
-								// Good, logged into convomail
+								// Good, logged into mailstats
 
 								// // Trigger a contacts sync
 								// Api.event({
@@ -301,7 +245,7 @@ var App = {
 
 							}) // end .then
 							.fail(function(failInfo){
-								// Failed Convomail login
+								// Failed MailStats login
 								// - already started the process of opening windows, so we put the brakes on that, then totally log the person out
 
 								// 
@@ -322,7 +266,7 @@ var App = {
 								}
 
 								// Might have failed if the API was unreachable
-								console.log('Failed Convomail login');
+								console.log('Failed MailStats login');
 
 								// localStorage.setItem(App.Credentials.prefix_access_token + 'access_token',null);
 								// 
@@ -577,13 +521,13 @@ var App = {
 									break;
 								case 1:
 									// Only a single message, use normal
-									App.Plugins.Convomail.process_push_notification_message(App.Data.notifications_queue.pop());
+									App.Plugins.MailStats.process_push_notification_message(App.Data.notifications_queue.pop());
 									break;
 								default:
 									// Multiple notifications
 									// - get last added
 									alert('Multiple Push Notifications Received. Latest Processed');
-									App.Plugins.Convomail.process_push_notification_message(App.Data.notifications_queue.pop());
+									App.Plugins.MailStats.process_push_notification_message(App.Data.notifications_queue.pop());
 									App.Data.notifications_queue = [];
 									break;
 							}
@@ -677,7 +621,7 @@ function onNotificationGCM(e){
 						// See if logged in
 						if(App.Data.LoggedIn){
 							// Sweet, logged in, update remote
-							App.Plugins.Convomail.updateAndroidPushRegId(App.Credentials.android_reg_id);
+							App.Plugins.MailStats.updateAndroidPushRegId(App.Credentials.android_reg_id);
 						} else {
 							// Run again
 							App.Utils.Notification.debug.temp('NLI - try again' + i);
@@ -704,7 +648,7 @@ function onNotificationGCM(e){
 			if (e.foreground){
 				// We were in the foreground when it was incoming
 				// - process right away
-				App.Plugins.Convomail.process_push_notification_message(e);
+				App.Plugins.MailStats.process_push_notification_message(e);
 			} else {
 				// Not in the foreground
 				// - they clicked the notification
@@ -725,7 +669,7 @@ function onNotificationGCM(e){
 			// 	App.Data.notifications_queue.push(e);
 			// } else {
 			// 	// Not paused, immediately take action on the item
-			// 	App.Plugins.Convomail.process_push_notification_message(e);
+			// 	App.Plugins.MailStats.process_push_notification_message(e);
 			// }
 
 		break;

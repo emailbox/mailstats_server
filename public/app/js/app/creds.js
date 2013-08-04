@@ -20,7 +20,7 @@ var tmp_credentials = {
 	thread_move_x_threshold: 0.2,
 	thread_move_y_threshold: 50, 
 	
-	convomail_server: 'http://mailstats.getemailbox.com',
+	mailstats_server: 'https://mailstats.getemailbox.com',
 
 	usePatching: false, // emailbox diff/patch
 	useCache: true // backbone.cache to localStorage
