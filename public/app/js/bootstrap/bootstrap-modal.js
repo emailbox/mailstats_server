@@ -137,7 +137,7 @@
       this.$backdrop = $('<div class="modal-backdrop ' + animate + '" />')
         .appendTo(document.body)
 
-      if (this.options.backdrop != 'static') {
+      if (this.options.backdrop != 'static' && this.options.backdrop_click !== false) {
         this.$backdrop.click($.proxy(this.hide, this))
       }
 

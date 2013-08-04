@@ -14,22 +14,22 @@ General Helpers
 // Some from https://raw.github.com/gist/1468937/f76f926f7961ea731fe30c4095a9e95dfe785eba/handlebars-helpers.js
 
 // Helpers
-Handlebars.registerHelper("ifCond", function(val1, val2, fn, elseFn) {
+Handlebars.registerHelper("ifCond", function(val1, val2, options) {
 	
 	if (val1 == val2) {
-		return fn(this);
-	} else if(elseFn != undefined) {
-		return elseFn(this);
+		return options.fn(this);
+	} else if(options.inverse != undefined) {
+		return options.inverse(this);
 	} else {
 		return null;
 	}
 });
-Handlebars.registerHelper("ifTypeCond", function(val1, val2, fn, elseFn) {
+Handlebars.registerHelper("ifTypeCond", function(val1, val2, options) {
 	
 	if (typeof(val1) == val2) {
-		return fn(this);
-	} else if(elseFn != undefined) {
-		return elseFn(this);
+		return options.fn(this);
+	} else if(options.inverse != undefined) {
+		return options.inverse(this);
 	} else {
 		return null;
 	}
@@ -39,14 +39,14 @@ Handlebars.registerHelper("ifTypeCond", function(val1, val2, fn, elseFn) {
 // {{#each_with_index records}}
 //  <li class="legend_item{{index}}"><span></span>{{Name}}</li>
 // {{/each_with_index}}
-Handlebars.registerHelper("each_with_index", function(array, fn) {
+Handlebars.registerHelper("each_with_index", function(array, options) {
   var total = array.length;
   var buffer = "";
 
   $.each(array,function(i,v){
-  	var item = $.extend(v);
+  	var item = v;
   	item.index = i;
-  	buffer += fn(item);
+  	buffer += options.fn(item);
   });
 
   return buffer;
@@ -65,23 +65,6 @@ Handlebars.registerHelper("each_with_index", function(array, fn) {
 
   // // return the finished buffer
   // return buffer;
-
-});
-
-
-Handlebars.registerHelper("each_with_index2", function(array, fn) {
-  var total = array.length;
-  var buffer = "";
-
-  $.each(array,function(i,v){
-  	// window.console.log(typeof array);
-  	// window.console.log(array);
-  	var item = $.extend(v);
-  	item.index = i;
-  	buffer += fn(item);
-  });
-
-  return buffer;
 
 });
 
@@ -138,6 +121,118 @@ Handlebars.registerHelper('compare', function (lvalue, operator, rvalue, options
 
 });
 
+
+
+Handlebars.registerHelper('compare_length', function (lvalue, operator, rvalue, options) {
+	// Able to do things like:
+	/*
+
+	{{#compare Database.Tables.Count ">" 5}}
+		There are more than 5 tables
+	{{/compare}}
+
+	{{#compare "Test" "Test"}}
+		Default comparison of "==="
+	{{/compare}}
+
+	*/
+
+    var operators, result;
+
+    if(lvalue == "undefined" || lvalue == null){
+    	return options.inverse(this);
+    }
+    
+    if (arguments.length < 3) {
+        throw new Error("Handlerbars Helper 'compare' needs 2 parameters");
+    }
+    
+    if (options === undefined) {
+        options = rvalue;
+        rvalue = operator;
+        operator = "===";
+    }
+    
+    operators = {
+        '==': function (l, r) { return l == r; },
+        '===': function (l, r) { return l === r; },
+        '!=': function (l, r) { return l != r; },
+        '!==': function (l, r) { return l !== r; },
+        '<': function (l, r) { return l < r; },
+        '>': function (l, r) { return l > r; },
+        '<=': function (l, r) { return l <= r; },
+        '>=': function (l, r) { return l >= r; },
+        'typeof': function (l, r) { return typeof l == r; }
+    };
+    
+    if (!operators[operator]) {
+        throw new Error("Handlerbars Helper 'compare' doesn't know the operator " + operator);
+    }
+    
+    result = operators[operator](lvalue.length, rvalue);
+    
+    if (result) {
+        return options.fn(this);
+    } else {
+        return options.inverse(this);
+    }
+
+});
+
+
+
+Handlebars.registerHelper('compare_size', function (lvalue, operator, rvalue, options) {
+	// Able to do things like:
+	/*
+
+	{{#compare Database.Tables.Count ">" 5}}
+		There are more than 5 tables
+	{{/compare}}
+
+	{{#compare "Test" "Test"}}
+		Default comparison of "==="
+	{{/compare}}
+
+	*/
+
+    var operators, result;
+    
+    if (arguments.length < 3) {
+        throw new Error("Handlerbars Helper 'compare' needs 2 parameters");
+    }
+    
+    if (options === undefined) {
+        options = rvalue;
+        rvalue = operator;
+        operator = "===";
+    }
+    
+    operators = {
+        '==': function (l, r) { return l == r; },
+        '===': function (l, r) { return l === r; },
+        '!=': function (l, r) { return l != r; },
+        '!==': function (l, r) { return l !== r; },
+        '<': function (l, r) { return l < r; },
+        '>': function (l, r) { return l > r; },
+        '<=': function (l, r) { return l <= r; },
+        '>=': function (l, r) { return l >= r; },
+        'typeof': function (l, r) { return typeof l == r; }
+    };
+    
+    if (!operators[operator]) {
+        throw new Error("Handlerbars Helper 'compare' doesn't know the operator " + operator);
+    }
+    
+    result = operators[operator](_.size(lvalue), rvalue);
+    
+    if (result) {
+        return options.fn(this);
+    } else {
+        return options.inverse(this);
+    }
+
+});
+
 Handlebars.registerHelper("ifCondIn", function(val1, val2, fn, elseFn) {
 	// Doesn't work, not sure how to pass in values as an array!
 	// - seems to only accept strings? Should I stringify them?
@@ -152,39 +247,40 @@ Handlebars.registerHelper("ifCondIn", function(val1, val2, fn, elseFn) {
 });
 
 
-Handlebars.registerHelper("Empty", function(val, fn, elseFn) {
+Handlebars.registerHelper("Empty", function(val, options) {
 
-	if (val == "undefined" || val == null || val.length == 0 || $.isEmptyObject(val)){
-		if(fn != undefined){
-			return fn(this);
+	if (val == "undefined" || val == null || val.length == 0){
+		if(options.fn != undefined){
+			return options.fn(this);
 		} else {
 			return null;
 		}
 	}
-	
-	if(elseFn != undefined){
-		return elseFn(this);
+
+	if(options.inverse != undefined){
+		return options.inverse(this);
 	} else {
 		return null;
 	}
 
+
 });
 
 
-Handlebars.registerHelper("NotEmpty", function(val, fn, elseFn) {
+Handlebars.registerHelper("NotEmpty", function(val, options) {
 	
-	if (val == "undefined" || val == null ||  val.length == 0 || $.isEmptyObject(val)){
-		if(elseFn != undefined){
-			return elseFn(this);
+	if (val == "undefined" || val == null){
+		if(options.inverse != undefined){
+			return options.inverse(this);
 		} else {
 			return null;
 		}
 	}
 
 	if (val.length > 0) {
-		return fn(this);
-	} else if(elseFn != undefined) {
-		return elseFn(this);
+		return options.fn(this);
+	} else if(options.inverse != undefined) {
+		return options.inverse(this);
 	} else {
 		return null;
 	}
@@ -194,18 +290,10 @@ Handlebars.registerHelper("NotEmpty", function(val, fn, elseFn) {
 Handlebars.registerHelper("print", function(v) {
 	//  Either today's date-time, or Yesterday, or Date
 
-	window.console.log('Print from helper:');
-	window.console.log(v);
+	// clog('Print from helper:');
+	clog(v);
 
 	return null;
-
-});
-
-
-Handlebars.registerHelper("html", function(v) {
-	//  Either today's date-time, or Yesterday, or Date
-
-	return v;
 
 });
 
@@ -225,14 +313,14 @@ Handlebars.registerHelper('include', function(template, options){
 	return new Handlebars.SafeString(partial(context)); // eh, should I do SafeString here? Doesn't it strip HTML or some shit?
 });
 
-Handlebars.registerHelper("key_value", function(obj, fn) {
+Handlebars.registerHelper("key_value", function(obj, options) {
 	// Might need to be used in conjunction with ensure_string (helper)
 	var buffer = "",
 		key;
 
 	for (key in obj) {
 		if (obj.hasOwnProperty(key)) {
-			buffer += fn({key: key, value: obj[key]});
+			buffer += options.fn({key: key, value: obj[key]});
 		}
 	}
 
@@ -245,14 +333,14 @@ Handlebars.registerHelper("key_value", function(obj, fn) {
 // usage: {{debug}} or {{debug someValue}}
 // from: @commondream (http://thinkvitamin.com/code/handlebars-js-part-3-tips-and-tricks/)
 Handlebars.registerHelper("debug", function(optionalValue) {
-  console.log("Current Context");
-  console.log("====================");
-  console.log(this);
+  clog("Current Context");
+  clog("====================");
+  clog(this);
  
   if (optionalValue) {
-    console.log("Value");
-    console.log("====================");
-    console.log(optionalValue);
+    clog("Value");
+    clog("====================");
+    clog(optionalValue);
   }
 });
 
@@ -301,6 +389,29 @@ Handlebars.registerHelper('toSentence', function(context, block) {
   return ret;
 });
 
+/**
+ * If Not In (an array)
+ * if_not_in this compare=that
+ */
+Handlebars.registerHelper('if_in', function(val, arr, options) {
+	if ($.inArray(val, arr) != -1){
+		return options.fn(this);
+	} else {
+		return options.inverse(this);
+	}
+});
+
+/**
+ * If Not In (an array)
+ * if_not_in this compare=that
+ */
+Handlebars.registerHelper('if_not_in', function(val, arr, options) {
+	if ($.inArray(val, arr) == -1){
+		return options.fn(this);
+	} else {
+		return options.inverse(this);
+	}
+});
 
 /* Handlebars Helpers - Dan Harper (http://github.com/danharper) */
 
@@ -434,6 +545,11 @@ Handlebars.registerHelper("ensure_string", function(obj) {
 Application Specific Helpers
 //////////////////////////*/
 
+
+Handlebars.registerHelper("echo", function(obj) {
+	return new Handlebars.SafeString(obj);
+});
+
 Handlebars.registerHelper("getclient", function(client_id) {
 	
 	return App.Models.ClientData[client_id].name;
@@ -445,15 +561,28 @@ Handlebars.registerHelper("display_from", function(Email) {
 	return 'From';
 });
 
+Handlebars.registerHelper("display_threads_unread_total", function(threads) {
+	// Count total unread threads
+	var threads = _.filter(threads,function(thread){
+		if(!thread.Thread.attributes.read.status){
+			return true;
+		}
+	});
+	return threads.length;
+});
+Handlebars.registerHelper("display_threads_total", function(threads) {
+	return threads.length;
+});
+
+
 Handlebars.registerHelper("display_last_message", function(Thread) {
 	// Return the latest message (incoming vs. outgoing?)
 
 	var result = '';
 
-	if(typeof Thread.attributes.last_message != 'undefined' && Thread.attributes.last_message !== false){
+	if(typeof Thread.latest_email.common.date_sec != 'undefined' && Thread.latest_email.common.date_sec !== false){
 		// Uses Thread.attributes.last_message
-		Thread.attributes.last_message = Thread.attributes.last_message.toString();
-		result = new Handlebars.SafeString(Thread.attributes.last_message.substr(0,100));
+		result = new Handlebars.SafeString(Thread.latest_email.original.TextBody.substr(0,100));
 		result = result.toString();
 	}
 
@@ -463,31 +592,90 @@ Handlebars.registerHelper("display_last_message", function(Thread) {
 
 	return result;
 
-	// Old version using latest Email
+});
 
-	if(emails.length <= 0){
-		return '[Empty Thread]';
-	}
 
-	// Received or Sent?
-	var email = emails[0];
+Handlebars.registerHelper("display_last_message_of_email", function(Email) {
+	// Return the latest message (incoming vs. outgoing?)
+
 	var result = '';
-	//if(email.attributes.type == 'received' && typeof email.original.TextBody != 'undefined'){
-		result = new Handlebars.SafeString(email.original.TextBody.substr(0,100));
-		result = result.toString();
-	//}
-	/*
-	if(email.attributes.type == 'sent' && typeof email.original.Text != 'undefined'){
-		result = new Handlebars.SafeString(email.original.Text.substr(0,100));
-		result = '<i class="icon-arrow-left"></i>' + result.toString();
+
+	clog(Email);
+
+	try {
+		return Email.original.ParsedData[0].Data.substr(0,140);
+	} catch(err){
+		return "...missing email..."
 	}
-	*/
-	
-	if(result.length <= 0){
-		result = '[Empty Message]';
-	}
+
 	return result;
 
+});
+
+
+Handlebars.registerHelper("display_unread_leisure_count", function(number) {
+	// Figure out how many unread there are
+	if(number > 5){
+		return "5<super>+</super>";
+	}
+
+	if(number == 0){
+		return '';
+	}
+
+	return number;
+
+});
+Handlebars.registerHelper("display_unread_leisure_count_old", function(threads) {
+	// Figure out how many unread there are
+	var unread = 0;
+
+	$.each(threads,function(i,Thread){
+		if(!Thread.attributes.read.status){
+			unread++;
+		}
+	});
+
+	if(unread > 0){
+		return new Handlebars.SafeString('<span class="circle unread"><span>' + unread + '</span></span>');
+	} else {
+		return '';
+	}
+
+});
+
+
+
+Handlebars.registerHelper("count", function(list) {
+	// Figure out how many unread there are
+	try {
+		return list.length;
+	} catch(err){
+		return 0;
+		// return _.size(list);
+	}
+
+});
+
+
+
+Handlebars.registerHelper("display_last_thread_monthday", function(datetime) {
+	// Return "Sept 1" or similar
+
+	var d = new Date(datetime);
+
+	var month = App.Utils.Date.getMonthAbbr(datetime);
+
+	return month + ' ' + d.getDate();
+	
+});
+
+
+Handlebars.registerHelper("display_parsed_text", function(str) {
+	result = new Handlebars.SafeString(str);
+	result = result.toString();
+
+	return result;
 });
 
 
@@ -501,6 +689,48 @@ Handlebars.registerHelper("display_shorttime", function(varDate) {
 	
 	try {
 		var message = new Date(varDate);
+		if(message.toString() == 'Invalid Date'){
+			message.setISO8601(varDate);
+		}
+	} catch (e){
+		// Failed building date
+		return 'faileddate1';
+	}
+
+	if(isNaN(message)){
+		return 'faileddate2';
+	}
+
+	if(now.format('Y-m-d') == message.format('Y-m-d')){
+		// Today, Display hours and minutes
+
+		return message.format('h:MM tt');
+
+	} else if(yesterday.format('Y-m-d') == message.format('Y-m-d')) {
+		// Display "yesterday"
+
+		return 'Yesterday';
+
+	} else {
+		// Display date
+
+		return message.format('mmm d');
+
+	}
+
+});
+
+
+Handlebars.registerHelper("display_shorttime_from_seconds", function(varDate) {
+	//  Either today's date-time, or Yesterday, or Date
+
+	var now = new Date();
+	var yesterday = new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	//var today = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+	
+	try {
+		var message = new Date(varDate * 1000);
 		if(message.toString() == 'Invalid Date'){
 			message.setISO8601(varDate);
 		}
@@ -589,6 +819,19 @@ Handlebars.registerHelper("display_thread_count", function(emails) {
 	}
 
 	var tmp = '<span class="label label-default">'+emails.length+'</span>';
+	return new Handlebars.SafeString(tmp);
+
+});
+
+
+Handlebars.registerHelper("display_thread_count_total_emails", function(thread) {
+	// Count the threads
+	//  - return nothing if == 0
+	if(thread.attributes.total_emails == undefined || parseInt(thread.attributes.total_emails, 10) <= 1){
+		return '';
+	}
+	
+	var tmp = '<span class="label label-default">'+thread.attributes.total_emails.toString()+'</span>';
 	return new Handlebars.SafeString(tmp);
 
 });
@@ -711,6 +954,23 @@ Handlebars.registerHelper("display_favicon", function(emails) {
 });
 
 
+Handlebars.registerHelper("attachment_small_preview", function(attachment) {
+	// Return preview of image
+	// - or nothing
+
+	try {
+		if(attachment.thumbs.basewidth300){
+			return '<img src="'+ attachment.thumbs.basewidth300.path +'" max-width="16" max-height="16" />';
+		}
+	} catch(err){
+		// pass
+	}
+
+	return "&nbsp;";
+
+});
+
+
 Handlebars.registerHelper("display_address_email", function(address) {
 	//  Normall we would display the contact's gravatar
 	//  - the plugin should handle this
@@ -748,30 +1008,235 @@ Handlebars.registerHelper("display_address_name", function(address) {
 });
 
 
-Handlebars.registerHelper("display_bodies", function(parsedData) {
+Handlebars.registerHelper("display_bodies", function(Email) {
 	// Display the first ParsedData entry
 	// - hide any additional entries
-	
+
+	var parsedData = Email.original.ParsedData;
+	// console.dir(Email.original.ParsedData);
+	var tmp = '';
+
+	// Building sections
+	// - now incorporates Edited Emails (convomail only)
+	var i = 0;
+	// for (x in parsedData){
+	_.each(parsedData,function(pieceOfData, index){
+		i++;
+		var content = '';
+		// console.log(pieceOfData);
+		try {
+			if(pieceOfData.Body.length > 0){
+				content = App.Utils.nl2br(pieceOfData.Body, false);
+
+				if($.trim(content) == ""){
+					// Missing content, probably HTML content
+					content = "[Email Content as HTML]"; // content non-existant, need to show a button for HTML view?
+				}
+
+				tmp += '<div class="ParsedDataContent" data-level="'+index+'">'+content+'</div>';
+				// tmp += '<div class="signature">' + App.Utils.nl2br(pieceOfData.Signature) + '</div>';
+				// content += '<div class="signature">' + App.Utils.nl2br(pieceOfData.Signature) + '</div>';
+				// go to next parsedData
+				return;
+			} else {
+				content = pieceOfData.Data;
+				content = App.Utils.nl2br(content,false);
+			}
+		} catch(err){
+			// console.log(parsedData[x]);
+			content = pieceOfData.Data;
+			content = App.Utils.nl2br(content,false);
+
+			if($.trim(content) == ""){
+				// Missing content, probably HTML content
+				content = "[Email Content as HTML]";  // content non-existant, need to show a button for HTML view?
+			}
+		}
+
+		tmp += '<div class="ParsedDataContent" data-level="'+index+'">'+content+'</div>';
+		
+	});
+
+	// Clickable selector to see the rest of the conversation
+	// - only if the conversation is much longer
+	if (i > 1){
+		//tmp += '<div class="ParsedDataShowAll"><span>show '+ (i-1) +' previous</span></div>';
+		tmp += '<div class="ParsedDataShowAll clearfix"><span class="expander">...</span><span class="edit">E</span></div>';
+	}
+
+	return new Handlebars.SafeString(tmp);
+
+});
+
+
+Handlebars.registerHelper("display_body", function(Email) {
+	// Display the first ParsedData entry
+	// - hide any additional entries
+
+	var parsedData = Email.original.TextBody;
+
+	return new Handlebars.SafeString(App.Utils.nl2br(Email.original.TextBody));
+
 	var tmp = '';
 	var content = '';
 
 	// Building sections
+	// - now incorporates Edited Emails (convomail only)
 	var i = 0;
 	for (x in parsedData){
 		i++;
 		content = parsedData[x].Data;
 		content = App.Utils.nl2br(content,false);
-		tmp += '<div class="ParsedDataContent" data-level="'+x+'">'+content+'</div>';
+		if(i == 1){
+			try {
+				content = Email.AppPkgDevConvomail.textbody_edited;
+				content = App.Utils.nl2br(content,false);
+			} catch(err){
+				
+			}
+			tmp += '<div class="ParsedDataContent" data-level="'+x+'">'+content+'</div>';
+		} else {
+			// do the normal thing
+			tmp += '<div class="ParsedDataContent" data-level="'+x+'">'+content+'</div>';
+		}
 	}
 
 	// Clickable selector to see the rest of the conversation
+	// - only if the conversation is much longer
 	if (i > 1){
 		//tmp += '<div class="ParsedDataShowAll"><span>show '+ (i-1) +' previous</span></div>';
-		tmp += '<div class="ParsedDataShowAll"><span>...</span></div>';
+		tmp += '<div class="ParsedDataShowAll clearfix"><span class="expander">...</span><span class="edit">E</span></div>';
 	}
 
 	return new Handlebars.SafeString(tmp);
 
+});
+
+
+Handlebars.registerHelper("topflag", function(flag_name) {
+	// Display the first ParsedData entry
+	// - hide any additional entries
+
+	var flag = "";
+
+	switch(flag_name){
+		case "undecided":
+			// flag = "New Threads";
+			flag = "Inbox";
+			break;
+		case "delayed":
+			flag = "Due Now";
+			break;
+		case "later":
+			flag = "Due Later";
+			break;
+		case "inbox":
+			flag = "Inbox";
+			break;
+		case "me":
+			flag = "Waiting On Me";
+			break;
+		case "other":
+			flag = "Waiting On Other";
+			break;
+		default:
+			break;
+	}
+
+	return new Handlebars.SafeString(flag);
+
+
+});
+
+
+Handlebars.registerHelper("due_ago", function(threadType, varSeconds) {
+	//  Total minutes, hours, days ago since varDate
+
+	// Only used for certain types of Threads
+	// - different response based on if it is due now, or later
+
+	var now = new Date();
+	var now_seconds = parseInt(now.getTime() / 1000);
+
+	var seconds_diff = Math.floor(now_seconds - varSeconds);
+
+	var minute = 60;
+	var hour = minute * 60;
+	var day = hour * 24;
+
+	// Seconds even defined?
+	if(varSeconds == undefined){
+		return '';
+	}
+
+	var text_result = '';
+
+	if(threadType == 'later'){
+		// "due in ..."
+		// - different color
+
+		// expecting negative values
+		if(seconds_diff > 0){
+			// Now
+			text_result = 'now';
+
+		} else {
+			// Non-negative
+			seconds_diff = seconds_diff * -1;
+
+			if(seconds_diff > day){
+				// Days
+				var days = Math.floor(seconds_diff / day);
+				text_result = days + 'd';
+
+			} else if(seconds_diff > hour){
+				// Hours
+				var hours = Math.floor(seconds_diff / hour);
+				text_result = hours + 'h';
+
+			} else if(seconds_diff > minute){
+				// Minutes
+				var minutes = Math.floor(seconds_diff / minute);
+				text_result = minutes + 'm';
+
+			} else {
+				// Seconds
+				text_result = 'dunno';
+			}
+
+		}
+
+
+
+	} else if(threadType == 'delayed'){
+		// Past due
+
+		if(seconds_diff > day){
+			// Days
+			var days = Math.floor(seconds_diff / day);
+			text_result = days + 'd';
+
+		} else if(seconds_diff > hour){
+			// Hours
+			var hours = Math.floor(seconds_diff / hour);
+			text_result = hours + 'h';
+
+		} else if(seconds_diff > minute){
+			// Minutes
+			var minutes = Math.floor(seconds_diff / minute);
+			text_result = minutes + 'm';
+
+		} else {
+			// Seconds
+			text_result = 'now';
+		}
+
+	} else {
+		// Do nothing
+	}
+
+	return new Handlebars.SafeString(text_result); // no icon-time
+	// return new Handlebars.SafeString(text_result + '<i class="icon-time"></i>');
 });
 
 
@@ -791,58 +1256,210 @@ Handlebars.registerHelper("daysago", function(varDate) {
 });
 
 
-Handlebars.registerHelper("thread_participants", function(data) {
-	// Return multiple senders
+Handlebars.registerHelper("thread_participants_pretty", function(emails) {
+	// Return (pretty) names of participants
 
-	var names = [];
-
-	$.each(data,function(i,email){
+	var all_names = [];
+	_.each(emails,function(email, j){
 
 		// Received or Sent?
 		var email_address = '';
-		if(email.attributes.type == 'received'){
-			email_address = email.original.headers.From;
-		}
-		if(email.attributes.type == 'sent'){
-			email_address = email.original.headers.To;
-		}
+		
+		// Doesn't matter, just summarize everybody
+		var to_search = ['From','To','Reply-To'];
 
-		// Get the From Address
-		var sender = App.Utils.cp(email_address);
+		var names = [];
+		_.each(to_search,function(search_val, i){
+			var tmp = search_val + '_Parsed';
+			if(typeof email.original.headers[tmp] == 'undefined'){
+				return;
+			}
+			// Parse search values
+			_.each(email.original.headers[tmp],function(person, k){
+				var name = person[0];
+				var email = person[1];
 
-		if(typeof sender == 'object'){
-			sender = sender[0]; // Name of the person
-		}
+				var tmp_isme = false;
+				_.each(App.Data.UserEmailAccounts.toJSON(),function(acct, l){
+					if(acct.email == email){
+						tmp_isme = true;
+					}
+				});
 
-		var dupSender = sender;
-		var tmp = sender;
+				if(tmp_isme){
+					if(search_val == 'To'){
+						return;
+					}
+					all_names.push('Me');
+					return;
+				}
 
-		// Remove .com
-		if(dupSender == null){
-			names.push(tmp);
-			return;
-		}
-
-		if(dupSender.substr(dupSender.length - 4) == '.com'){
-			tmp = dupSender.substr(0,dupSender.length - 4);
-		}
-
-		// In Contacts?
-		// - todo...
-
-		// Just the sender
-		if(dupSender.length > 0){
-			// This can sometimes be really awkward looking (with ? marks, etc.)
-			//return email.data.FromName;
-		}
-
-		names.push(tmp);
+				if(name.length < 1 || name.length > 50){
+					// clog('Too short, or too long of name');
+					// clog(name);
+					all_names.push('unknown');
+					return;
+				}
+				all_names.push(name);
+			});
+		});
 
 	});
 
-	names = _.uniq(names);
+	all_names = _.uniq(all_names);
 
-	return names.join(', ');
+	return all_names.join(', ');
+
+});
+
+
+Handlebars.registerHelper("convo_person_name", function(convo) {
+	// Return (pretty) names of last sender
+
+	try {
+		return convo.name;
+	} catch(err){
+		return convo.contact_email;
+	}
+
+});
+
+
+Handlebars.registerHelper("thread_last_sender_pretty", function(emails) {
+	// Return (pretty) names of last sender
+
+	var from = emails[emails.length - 1].original.headers.From_Parsed[0];
+	if(from[0].length > 0){
+		// Has a name
+		return from[0];
+	} else {
+		// Use email
+		return from[1];
+	}
+
+});
+
+
+Handlebars.registerHelper("email_participants_pretty", function(email) {
+	// Return (pretty) names of participants
+
+	var all_names = [];
+
+	// Received or Sent?
+	var email_address = '';
+	
+	// Doesn't matter, just summarize everybody
+	var to_search = ['From','To','Reply-To'];
+
+	var names = [];
+	_.each(to_search,function(search_val, i){
+		var tmp = search_val + '_Parsed';
+		if(typeof email.original.headers[tmp] == 'undefined'){
+			return;
+		}
+		// Parse search values
+		_.each(email.original.headers[tmp],function(person, k){
+			try {
+				var name = person[0];
+				var email = person[1];
+
+				var tmp_isme = false;
+				_.each(App.Data.UserEmailAccounts.toJSON(),function(acct, l){
+					if(acct.email == email){
+						tmp_isme = true;
+					}
+				});
+
+				if(tmp_isme){
+					if(search_val == 'To'){
+						return;
+					}
+					all_names.push('Me');
+					return;
+				}
+
+				if(name.length < 1 || name.length > 50){
+					// clog('Too short, or too long of name');
+					// clog(name);
+					all_names.push('unknown');
+					return;
+				}
+				all_names.push(name);
+			} catch(err){
+				// Failed finding, return unknown
+				all_names.push('unknown');
+			}
+		});
+	});
+
+
+	all_names = _.uniq(all_names);
+
+	return all_names.join(', ');
+
+});
+
+
+Handlebars.registerHelper("prettydate", function(v, format) {
+	//  Either today's date-time, or Yesterday, or Date
+
+	format = format || 'ddd, MMMM d, yyyy';
+	var tmp = new Date(v);
+	return tmp.toString(format)
+
+});
+
+
+Handlebars.registerHelper("thread_from_pretty", function(email) {
+	// SAME AS ABOVE (just outside $.each removed)
+
+	var all_names = [];
+
+	// Received or Sent?
+	var email_address = '';
+	
+	// Doesn't matter, just summarize everybody
+	var to_search = ['From'];
+
+	_.each(to_search,function(search_val, i){
+		var tmp = search_val + '_Parsed';
+		if(typeof email.original.headers[tmp] == 'undefined'){
+			return;
+		}
+		// Parse search values
+		_.each(email.original.headers[tmp],function(person, k){
+			var name = person[0];
+			var email = person[1];
+
+			var tmp_isme = false;
+			_.each(App.Data.UserEmailAccounts.toJSON(),function(acct, l){
+				if(acct.email == email){
+					tmp_isme = true;
+				}
+			});
+
+			if(tmp_isme){
+				if(search_val == 'To'){
+					return;
+				}
+				all_names.push('Me');
+				return;
+			}
+
+			if(name.length < 1 || name.length > 50){
+				// clog('Too short, or too long of name');
+				// clog(name);
+				all_names.push('unknown');
+				return;
+			}
+			all_names.push(name);
+		});
+	});
+
+
+	all_names = _.uniq(all_names);
+
+	return all_names.join(', ');
 
 });
 
@@ -850,6 +1467,16 @@ Handlebars.registerHelper("thread_participants", function(data) {
 Handlebars.registerHelper("thread_snippet", function(email) {
 	
 	return email.Entity.snippet;
+});
+
+
+Handlebars.registerHelper("thread_subject", function(subject) {
+	subject = $.trim(subject);
+	if(subject.length < 1){
+		subject = '[Empty Subject]';
+	}
+	return new Handlebars.SafeString(subject);
+
 });
 
 
@@ -884,7 +1511,7 @@ Handlebars.registerHelper("contactPhotoSmall", function(photos) {
 
 	var photo_url = false;
 
-	$.each(photos,function(i,photo){
+	_.each(photos,function(photo, i){
 		if(photo_url !== false){
 			// Already got photo
 			return;
@@ -897,7 +1524,7 @@ Handlebars.registerHelper("contactPhotoSmall", function(photos) {
 
 	// Check Twitter
 	if(photo_url !== false){
-		$.each(photos,function(i,photo){
+		_.each(photos,function(photo, i){
 			if(photo.typeId == 'twitter'){
 				photo_url = photo.url;
 			}
@@ -911,12 +1538,24 @@ Handlebars.registerHelper("contactPhotoSmall", function(photos) {
 
 
 
+Handlebars.registerHelper("inbox_zero_words", function() {
+	
+	// Words/phrases to choose from
+	// - html ok
+	var words = ['Fuck Yeah', 
+				'Good Job', 
+				'Solid.',
+				'Nice Work',
+				'Noice'];
+
+	return words[Math.floor(Math.random()*words.length)];
+});
 
 
 
 Handlebars.registerHelper("testing", function(data) {
 	
-	console.log(data[''].snippet)
+	clog(data[''].snippet)
 });
 
 /* My old version, somebody might have made a better one above

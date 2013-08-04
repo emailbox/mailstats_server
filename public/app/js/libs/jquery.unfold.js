@@ -43,7 +43,7 @@
       if (ext == 'moz') {
         $slice.css({
           MozPerspective: opts.perspective, // Fix FF perspective issue
-          overflow: 'hidden',
+          overflow: 'hidden'
         });
       }
 
