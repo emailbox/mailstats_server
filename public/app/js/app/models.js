@@ -103,34 +103,6 @@ App.Models.ThreadFull = App.Models.EmailBoxModel.extend({
 });
 
 
-App.Models.ConversationFull = App.Models.EmailBoxModel.extend({
-	
-	sync: Backbone.cachingSync(emailbox_sync_model, 'ConversationFull'),
-
-	modelName: 'ConvomailConversation',
-	internalModelName: 'ConversationFull',
-	fields: [],
-	cacheType: 'full',
-
-	fetchFull: function(options){
-		// console.log('fetch ThreadFull');
-		// console.log(options);
-		// console.log(this.get('id'));
-		return this.fetch({
-			data: {
-				model: 'ConvomailConversation',
-				conditions: {
-					'_id' : this.id
-				},
-				fields: [],
-				limit: 1
-			}
-		});
-	}
-
-});
-
-
 App.Models.UserEmailAccount = App.Models.EmailBoxModel.extend({
 	
 	sync: Backbone.cachingSync(emailbox_sync_model, 'UserEmailAccount'),
@@ -193,39 +165,6 @@ App.Models.EmailFull = App.Models.EmailBoxModel.extend({
 					'-original.HtmlBodyOriginal',
 					'-original.ParsedDataHtml'
 				],
-				limit: 1
-			}
-		});
-	}
-
-});
-
-
-App.Models.LeisureFilterIds = App.Models.EmailBoxModel.extend({
-
-	modelName: 'AppConvomailLeisureFilter',
-	internalModelName: 'AppConvomailLeisureFilterFull',
-	sync: Backbone.cachingSync(emailbox_sync_model, 'AppConvomailLeisureFilterId')
-
-});
-
-App.Models.LeisureFilterFull = App.Models.EmailBoxModel.extend({
-
-	modelName: 'AppConvomailLeisureFilter',
-	internalModelName: 'AppConvomailLeisureFilterFull',
-	sync: Backbone.cachingSync(emailbox_sync_model, 'AppConvomailLeisureFilterFull'),
-
-	fetchFull: function(options){
-		// console.log('fetch ThreadFull');
-		// console.log(options);
-		// console.log(this.get('id'));
-		return this.fetch({
-			data: {
-				model: 'AppConvomailLeisureFilter',
-				conditions: {
-					'_id' : this.id
-				},
-				fields: [],
 				limit: 1
 			}
 		});
