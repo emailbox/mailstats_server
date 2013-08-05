@@ -21,8 +21,26 @@ You can modify and run the basic stand-alone client app (that communicates to th
 - Accept incoming stats creation requests  
 - serves the stats app from /public/app  
 
-## Current status  
-- It works.
+## Currently supported stats  
+- Received vs. Sent summary, today (with hours) and 7-day  
+- Response times  
+- Top 10 Contacts: Sent To, Received From, and CC'd (sent and received)  
+- Top 5 Domains: Sent To, Received From, and CC'd (sent and received)  
+
+
+## Upcoming Stats 
+- attachments per email
+     - attachment senders, and recipients
+     - file size sent (in MB), total and across a chat
+- labels
+     - total labels used, all the labels, 10 most frequent labels
+- email activity
+     - across the week (already done?)
+     - in hourly slots on each day
+          - On Mondays it is, On Tues it is…
+          - For an average day it is…
+- 5 slowest responses
+     - in same category as time-to-respond
 
 
 
