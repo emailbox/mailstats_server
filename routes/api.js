@@ -175,7 +175,7 @@ exports.stats = function(req, res){
 
 	// Get the local user_id
 	models.User.get_local_by_emailbox_id(bodyObj.auth.user_id)
-		.then(function(local_user){;
+		.then(function(local_user){
 			getUser.resolve(local_user);
 		})
 		.fail(function(errData){
