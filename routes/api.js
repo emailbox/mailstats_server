@@ -185,105 +185,141 @@ exports.stats = function(req, res){
 	getUser.promise
 		.then(function(local_user){
 
-			// Return JSON response that we are working on it (the model gets updated)
-			jsonSuccess(res, 'Working on stats update: AppMailStatsLatest._id=1');
+			models.cache.get('last_refresh_time_' + local_user.emailbox_id, function(error, cResult){
+				if(error){
+					console.log('=error getting last_refresh_time_');
+					console.log(error);
+					jsonError(res, 101, 'Unable to load stats, please try again');
+					return;
+				}
 
-			console.log('Perform each search');
+				// Get time
+				var now = new Date();
+				now = now.getTime();
 
-			// Timezone offset
-			var timezone_offset = parseInt(bodyObj.obj.timezone_offset, 10) || 0;
+				// 5 minutes
+				var fivemin = 1000 * 60 * 5;
+				fivemin = 1;
 
-			// Perform each search
-			// - not in parallel against the user's DB
-			var resultsDeferred = [];
+				// Convert received value to int (false => 0)
+				cResult = parseInt(cResult, 10);
 
-			models.Api.getLastMonthEmailsAndThreads(bodyObj, timezone_offset)
-				.then(function(threads_and_emails){
-					// Separate into Sent and Received
-					// result.threads
-					// result.emails_sent
-					// result.emails_rec
-					console.log('threads_and_emails');
+				if(cResult < (now - fivemin) || isNaN(cResult)){
+					// Return JSON response that we are working on it (the model gets updated)
+					jsonSuccess(res, 'Working on stats update: AppMailStatsLatest._id=1');
+				} else {
+					// Within 5 minutes
+					console.log('Too many refresh requests');
+					jsonError(res, 429, 'Too many refresh requests');
+					return;
+				}
 
-					// Execute tally-er functions
+				console.log('Perform each search');
 
-					// 0 - sent vs received
-					resultsDeferred.push(models.Stats.sent_vs_received(bodyObj, timezone_offset, threads_and_emails));
-
-					// 1 - time to respond
-					resultsDeferred.push(models.Stats.time_to_respond(bodyObj, timezone_offset, threads_and_emails));
-
-					// 3 - contacts
-					resultsDeferred.push(models.Stats.contacts(bodyObj, timezone_offset, threads_and_emails));
-
-					// 4 - attachments
-					resultsDeferred.push(models.Stats.attachments(bodyObj, timezone_offset, threads_and_emails));
-
-					// Wait for all searches to have been performed
-					Q.allResolved(resultsDeferred)
-						.then(function(promises){
-
-							console.log('resolved promises');
-
-							// All searches complete
-							// - get all of them and return along with indexKey
-							var endResults = {};
-							promises.forEach(function (promise, index) {
-								var tmp_val = promise.valueOf();
-
-								if(index == 0){
-									endResults['sent_vs_received'] = tmp_val;
-								}
-								if(index == 1){
-									endResults['time_to_respond'] = tmp_val;
-								}
-								if(index == 2){
-									endResults['contacts'] = tmp_val;
-								}
-								if(index == 2){
-									endResults['attachments'] = tmp_val;
-								}
-
-
-							});
-
-							// // Return results (rip out in next version)
-							// jsonSuccess(res, 'Refreshed', endResults);
-
-							// Save the new model
-							models.User.update_mailstats_latest(endResults, bodyObj.auth)
-								.then(function(){
-									console.log('back from update_mailstats_latest');
-									// Emit update event
-									var eventData = {
-										event: 'MailStats.updated',
-										obj: true
-									};
-									models.Emailbox.event(eventData, bodyObj.auth)
-										.then(function(){
-											console.log('Emitted event ok');
-										})
-										.fail(function(err){
-											console.log('fail1');
-											console.log(err);
-										});
-								});
-
-						})
-						.fail(function(data){
-							// data == [ indexKey, errCode, errMsg, errData ]
-							console.log('fail runEventCreate multiple');
-							console.log(data);
-							jsonError(res, 101, "Failed creating multiple events");
-						});
-
-
-				})
-				.fail(function(err){
-					console.log('getLastMonthEmailsAndThreads failed:');
-					console.log(err);
+				// Write memcache value
+				models.cache.set('last_refresh_time_' + local_user.emailbox_id, now, fivemin, function(error, cResult){
+					if(error){
+						console.log('FAILED updating memcache vaue');
+						return;
+					}
+					console.log('Saved Memcache value');
 				});
 
+				// Timezone offset
+				var timezone_offset = parseInt(bodyObj.obj.timezone_offset, 10) || 0;
+
+				// Perform each search
+				// - not in parallel against the user's DB
+				var resultsDeferred = [];
+
+				models.Api.getLastMonthEmailsAndThreads(bodyObj, timezone_offset)
+					.then(function(threads_and_emails){
+						// Separate into Sent and Received
+						// result.threads
+						// result.emails_sent
+						// result.emails_rec
+						console.log('threads_and_emails');
+
+						// Execute tally-er functions
+
+						// 0 - sent vs received
+						resultsDeferred.push(models.Stats.sent_vs_received(bodyObj, timezone_offset, threads_and_emails));
+
+						// 1 - time to respond
+						resultsDeferred.push(models.Stats.time_to_respond(bodyObj, timezone_offset, threads_and_emails));
+
+						// 3 - contacts
+						resultsDeferred.push(models.Stats.contacts(bodyObj, timezone_offset, threads_and_emails));
+
+						// 4 - attachments
+						resultsDeferred.push(models.Stats.attachments(bodyObj, timezone_offset, threads_and_emails));
+
+						// Wait for all searches to have been performed
+						Q.allResolved(resultsDeferred)
+							.then(function(promises){
+
+								console.log('resolved promises');
+
+								// All searches complete
+								// - get all of them and return along with indexKey
+								var endResults = {};
+								promises.forEach(function (promise, index) {
+									var tmp_val = promise.valueOf();
+
+									if(index == 0){
+										endResults['sent_vs_received'] = tmp_val;
+									}
+									if(index == 1){
+										endResults['time_to_respond'] = tmp_val;
+									}
+									if(index == 2){
+										endResults['contacts'] = tmp_val;
+									}
+									if(index == 2){
+										endResults['attachments'] = tmp_val;
+									}
+
+
+								});
+
+								// // Return results (rip out in next version)
+								// jsonSuccess(res, 'Refreshed', endResults);
+
+								// Save the new model
+								models.User.update_mailstats_latest(endResults, bodyObj.auth)
+									.then(function(){
+										console.log('back from update_mailstats_latest');
+										// Emit update event
+										var eventData = {
+											event: 'MailStats.updated',
+											obj: true
+										};
+										models.Emailbox.event(eventData, bodyObj.auth)
+											.then(function(){
+												console.log('Emitted event ok');
+											})
+											.fail(function(err){
+												console.log('fail1');
+												console.log(err);
+											});
+									});
+
+							})
+							.fail(function(data){
+								// data == [ indexKey, errCode, errMsg, errData ]
+								console.log('fail runEventCreate multiple');
+								console.log(data);
+								jsonError(res, 101, "Failed creating multiple events");
+							});
+
+
+					})
+					.fail(function(err){
+						console.log('getLastMonthEmailsAndThreads failed:');
+						console.log(err);
+					});
+
+			});
 
 		});
 

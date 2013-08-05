@@ -32,6 +32,36 @@ var mysqlPool = poolModule.Pool({
   log : false // if true, logs via console.log - can also be a function
 });
 
+// Memcache
+// var memcache = require('memcache');
+// var mc_client = new memcache.Client(11211, 'localhost');
+var Memcached = require('memcached');
+var mc_client = new Memcached(creds.memcache_server + ':' + creds.memcache_port);
+console.log('Memcache: ' + creds.memcache_server + ':' + creds.memcache_port);
+
+mc_client.on("issue", function(issue) {
+    console.log("MemcachedStore::Issue @ " + issue.server + ": " + issue.messages + ", " + issue.retries  + " attempts left");
+});
+mc_client.on("failure", function(details) {
+    console.log( "Server " + details.server + "went down due to: " + details.messages.join( '' ) );
+});
+mc_client.on('connect', function(){
+  console.log('Memcache connect success');
+});
+
+mc_client.on('close', function(){
+  console.log('Memcache closed');
+});
+
+mc_client.on('timeout', function(){
+  console.log('Memcache timeout');
+});
+
+mc_client.on('error', function(e){
+  console.log('Memcache error');
+  console.log(e);
+});
+
 
 // Test connecting to MySQL
 var connection_test = mysql.createConnection(defaultMySqlConnection);
@@ -79,6 +109,7 @@ mysqlPool.acquire(function(err, client) {
 
 // Export back to app
 exports.mysql = mysqlPool;
+exports.cache = mc_client;
 
 // Database Models
 exports.Api = require('./api.js');
