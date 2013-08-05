@@ -1426,7 +1426,7 @@ App.Views.ReportBug = Backbone.View.extend({
 		var to = 'nick@getemailbox.com'; // hardcoded email address for support/bugs
 
 		// Subject
-		var subject = 'Convomail bug report via awesome user';
+		var subject = 'MailStats bug report via awesome user';
 
 		// CC
 		// - should the person be cc'd
@@ -1683,7 +1683,7 @@ App.Views.Stats = Backbone.View.extend({
 		var that = this,
 			elem = ev.currentTarget;
 
-		App.Utils.Notification.toast('Refreshing');
+		App.Utils.Notification.toast('Refreshing, Please Wait a Moment');
 
 		this.refreshEvent();
 
@@ -1729,16 +1729,17 @@ App.Views.Stats = Backbone.View.extend({
 				"pkg.dev.mailstats" : function(response){
 					// Get stats
 					if(response.body.code != 200){
-						alert('Sorry, failed loading stats at this time');
+						if(response.body.code == 429){
+							App.Utils.Notification.toast('Five Minutes Required Between Refreshes','danger');
+						} else {
+							alert('Sorry, failed loading stats at this time');
+						}
 						return;
 					}
 
+					App.Utils.Notification.toast('Please Wait, Downloading Stats','success');
+
 					console.info('Stats triggered update OK we think');
-
-					// that.stats = response.body.data;
-
-					// // Emit that stats are ready now
-					// that.ev.trigger('StatsReady');
 
 				}
 			},
@@ -1908,7 +1909,7 @@ App.Views.Stats = Backbone.View.extend({
 		that.$('.stats_result').html(template(templateData));
 
 		// Update timestamp
-		this.$('.actual_timestamp').attr('data-livestamp',that.stats._modified);
+		this.$('.actual_timestamp').attr('data-livestamp',that.stats._modified - 10);
 
 		// Get charts to use from html
 		var summaryChart = this.$('#week_summary').get(0).getContext("2d");
