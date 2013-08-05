@@ -199,7 +199,7 @@ exports.stats = function(req, res){
 
 				// 5 minutes
 				var fivemin = 1000 * 60 * 5;
-				fivemin = 1;
+				// fivemin = 1;
 
 				// Convert received value to int (false => 0)
 				cResult = parseInt(cResult, 10);
